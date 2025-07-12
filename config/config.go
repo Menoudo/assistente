@@ -3,9 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
-// Config содержит конфигурацию приложения
 type Config struct {
 	TelegramBotToken string
 	MiniMaxAPIKey    string
@@ -14,8 +15,9 @@ type Config struct {
 	ServerPort       string
 }
 
-// Load загружает конфигурацию из переменных окружения
 func Load() (*Config, error) {
+	_ = godotenv.Load()
+
 	config := &Config{
 		TelegramBotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
 		MiniMaxAPIKey:    getEnv("MINIMAX_API_KEY", ""),
@@ -25,13 +27,12 @@ func Load() (*Config, error) {
 	}
 
 	if err := validateConfig(config); err != nil {
-		return nil, fmt.Errorf("конфигурация невалидна: %w", err)
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return config, nil
 }
 
-// getEnv возвращает значение переменной окружения или значение по умолчанию
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -39,24 +40,22 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// validateConfig проверяет обязательные переменные конфигурации
 func validateConfig(config *Config) error {
 	if config.TelegramBotToken == "" {
-		return fmt.Errorf("TELEGRAM_BOT_TOKEN обязателен")
+		return fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
 
 	if config.MiniMaxAPIKey == "" {
-		return fmt.Errorf("MINIMAX_API_KEY обязателен")
+		return fmt.Errorf("MINIMAX_API_KEY is required")
 	}
 
 	if config.DatabaseURL == "" {
-		return fmt.Errorf("DATABASE_URL обязателен")
+		return fmt.Errorf("DATABASE_URL is required")
 	}
 
 	return nil
 }
 
-// IsDevelopment проверяет, запущено ли приложение в режиме разработки
 func (c *Config) IsDevelopment() bool {
 	return c.LogLevel == "debug"
 }
