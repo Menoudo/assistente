@@ -10,6 +10,7 @@ import (
 
 	"telegram-bot-assistente/config"
 	"telegram-bot-assistente/internal/handlers"
+	"telegram-bot-assistente/internal/repository"
 
 	"gopkg.in/telebot.v3"
 )
@@ -19,6 +20,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	// Initialize database
+	db, err := repository.NewDatabase(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer db.Close()
+
+	// Create task repository
+	taskRepo := repository.NewTaskRepository(db)
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:  cfg.TelegramBotToken,
@@ -30,7 +41,7 @@ func main() {
 
 	log.Printf("Authorized as @%s", bot.Me.Username)
 
-	setupHandlers(bot)
+	setupHandlers(bot, taskRepo)
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -47,8 +58,8 @@ func main() {
 	log.Println("Bot stopped")
 }
 
-func setupHandlers(bot *telebot.Bot) {
-	h := handlers.NewHandlers()
+func setupHandlers(bot *telebot.Bot, taskRepo repository.TaskRepository) {
+	h := handlers.NewHandlers(taskRepo)
 	h.RegisterRoutes(bot)
 }
 

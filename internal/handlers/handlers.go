@@ -6,6 +6,10 @@ import (
 	"log"
 	"strings"
 
+	"telegram-bot-assistente/internal/models"
+	"telegram-bot-assistente/internal/repository"
+	"telegram-bot-assistente/internal/utils"
+
 	"gopkg.in/telebot.v3"
 )
 
@@ -16,20 +20,21 @@ type Handler interface {
 
 // Handlers содержит все обработчики команд бота
 type Handlers struct {
-	// Здесь будут добавлены зависимости для обработчиков
-	// repository repository.TaskRepository
+	repository repository.TaskRepository
+	// Будут добавлены позже:
 	// llmClient llm.Client
 	// limiter limiter.Limiter
 }
 
 // NewHandlers создает новый экземпляр Handlers
-func NewHandlers() *Handlers {
-	return &Handlers{}
+func NewHandlers(repo repository.TaskRepository) *Handlers {
+	return &Handlers{
+		repository: repo,
+	}
 }
 
 // RegisterRoutes регистрирует все маршруты команд бота
 func (h *Handlers) RegisterRoutes(bot *telebot.Bot) {
-	// Основные команды
 	bot.Handle("/start", h.handleStart)
 	bot.Handle("/help", h.handleHelp)
 	bot.Handle("/add", h.handleAdd)
@@ -37,7 +42,6 @@ func (h *Handlers) RegisterRoutes(bot *telebot.Bot) {
 	bot.Handle("/done", h.handleDone)
 	bot.Handle("/edit", h.handleEdit)
 
-	// Обработка текстовых сообщений (пересылаемые сообщения)
 	bot.Handle(telebot.OnText, h.handleMessage)
 
 	// Обработка неизвестных команд
@@ -104,9 +108,58 @@ func (h *Handlers) handleHelp(c telebot.Context) error {
 // handleAdd обрабатывает команду /add
 func (h *Handlers) handleAdd(c telebot.Context) error {
 	return h.safeHandle(c, func() error {
-		// TODO: Реализовать добавление задачи
-		// Здесь будет парсинг аргументов команды и сохранение в БД
-		return c.Send("🚧 Функция добавления задач в разработке")
+		userID := h.getUserID(c)
+		if userID == 0 {
+			return c.Send("❌ Не удалось определить пользователя")
+		}
+
+		// Get the full text of the message
+		text := c.Text()
+		if text == "" {
+			return c.Send("❌ Пустая команда. Используйте: /add \"Описание задачи\" срок: 2025-07-15")
+		}
+
+		// Parse the command
+		input, err := utils.ParseAddCommand(text)
+		if err != nil {
+			h.logUserAction(userID, "add_task_error", fmt.Sprintf("Parse error: %v", err))
+			return c.Send(fmt.Sprintf("❌ Ошибка в команде: %s\n\nПример: /add \"Купить продукты\" срок: 2025-07-20", err.Error()))
+		}
+
+		// Additional validation
+		if err := utils.ValidateDescription(input.Description); err != nil {
+			h.logUserAction(userID, "add_task_error", fmt.Sprintf("Validation error: %v", err))
+			return c.Send(fmt.Sprintf("❌ %s", err.Error()))
+		}
+
+		// Create the task
+		task := &models.Task{
+			UserID:              int(userID),
+			OriginalDescription: input.Description,
+			Status:              models.StatusActive,
+		}
+
+		if input.HasDeadline {
+			task.Deadline = input.Deadline
+		}
+
+		// Save to database
+		if err := h.repository.AddTask(task); err != nil {
+			h.logUserAction(userID, "add_task_error", fmt.Sprintf("Database error: %v", err))
+			return c.Send("❌ Не удалось сохранить задачу. Попробуйте позже.")
+		}
+
+		// Log successful action
+		h.logUserAction(userID, "add_task", fmt.Sprintf("Task ID: %d, Description: %s", task.ID, task.OriginalDescription))
+
+		// Format success message
+		successMsg := fmt.Sprintf("✅ Задача добавлена!\n\n📝 ID: %d\n📄 Описание: %s", task.ID, task.OriginalDescription)
+
+		if task.HasDeadline() {
+			successMsg += fmt.Sprintf("\n⏰ Срок: %s", task.Deadline.Format("02.01.2006"))
+		}
+
+		return c.Send(successMsg)
 	})
 }
 
