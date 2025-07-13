@@ -3,18 +3,38 @@ package handlers
 import (
 	"testing"
 
+	"telegram-bot-assistente/internal/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
+// mockTaskRepository is a simple mock for testing
+type mockTaskRepository struct{}
+
+func (m *mockTaskRepository) AddTask(task *models.Task) error                   { return nil }
+func (m *mockTaskRepository) GetTask(id int) (*models.Task, error)              { return nil, nil }
+func (m *mockTaskRepository) UpdateTask(task *models.Task) error                { return nil }
+func (m *mockTaskRepository) DeleteTask(id int) error                           { return nil }
+func (m *mockTaskRepository) GetTasksByUser(userID int) ([]*models.Task, error) { return nil, nil }
+func (m *mockTaskRepository) GetActiveTasks(userID int) ([]*models.Task, error) { return nil, nil }
+func (m *mockTaskRepository) GetTasksByStatus(userID int, status string) ([]*models.Task, error) {
+	return nil, nil
+}
+func (m *mockTaskRepository) GetOverdueTasks(userID int) ([]*models.Task, error) { return nil, nil }
+
+func createTestHandlers() *Handlers {
+	return NewHandlers(&mockTaskRepository{})
+}
+
 // TestNewHandlers тестирует создание экземпляра Handlers
 func TestNewHandlers(t *testing.T) {
-	handlers := NewHandlers()
+	handlers := createTestHandlers()
 	assert.NotNil(t, handlers)
 }
 
 // TestValidateCommand тестирует функцию валидации команд
 func TestValidateCommand(t *testing.T) {
-	handlers := NewHandlers()
+	handlers := createTestHandlers()
 
 	tests := []struct {
 		name     string
@@ -69,7 +89,7 @@ func TestValidateCommand(t *testing.T) {
 
 // TestLogUserAction тестирует функцию логирования действий пользователя
 func TestLogUserAction(t *testing.T) {
-	handlers := NewHandlers()
+	handlers := createTestHandlers()
 
 	// Тест должен проходить без паники
 	assert.NotPanics(t, func() {
@@ -79,7 +99,7 @@ func TestLogUserAction(t *testing.T) {
 
 // TestHandlersStructure тестирует структуру обработчиков
 func TestHandlersStructure(t *testing.T) {
-	handlers := NewHandlers()
+	handlers := createTestHandlers()
 
 	// Проверяем, что структура создается корректно
 	assert.NotNil(t, handlers)
